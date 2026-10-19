@@ -1,0 +1,20 @@
+{% extends "layout.njk" %}
+{% block title %}Yönetim — {{ storeName }}{% endblock %}
+{% block content %}
+<h1>Yönetim paneli</h1>
+<div class="stats" id="stats"></div>
+<div class="two-col">
+  <div>
+    <div class="panel"><h3>Kullanıcılar</h3><div id="users"><div class="empty">Yükleniyor…</div></div></div>
+    <div class="panel"><h3>Son siparişler</h3><div id="orders"><div class="empty">Yükleniyor…</div></div></div>
+  </div>
+  <div>
+    <div class="panel"><h3>Yönetici bildirimleri</h3><div id="notifications"><div class="empty">Yükleniyor…</div></div></div>
+    <div class="panel"><h3>Satış raporu</h3><div id="report"><div class="empty">Yükleniyor…</div></div></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+<script>Pusula.Dashboard.admin();</script>
+{% endblock %}

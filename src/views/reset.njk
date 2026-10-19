@@ -1,0 +1,28 @@
+{% extends "layout.njk" %}
+{% block title %}Yeni şifre belirle — {{ storeName }}{% endblock %}
+{% block content %}
+<div class="auth-box panel">
+  <h1>Yeni şifre belirle</h1>
+  <form id="reset-form">
+    <input type="hidden" name="token" value="{{ token }}">
+    <div class="field"><label>Yeni şifre</label><input type="password" name="password" required minlength="8"></div>
+    <div class="field"><label>Yeni şifre (tekrar)</label><input type="password" name="password2" required minlength="8"></div>
+    <div id="notice"></div>
+    <button class="btn" type="submit" style="width:100%">Şifreyi güncelle</button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('reset-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  if (fd.get('password') !== fd.get('password2')) return Pusula.showNotice('#notice', 'error', 'Şifreler eşleşmiyor');
+  try {
+    const data = await Pusula.api('/api/v2/auth/reset', { method: 'POST', body: { token: fd.get('token'), password: fd.get('password') } });
+    Pusula.showNotice('#notice', 'success', data.message);
+    setTimeout(() => location.href = '/login', 1500);
+  } catch (err) { Pusula.showNotice('#notice', 'error', err.message); }
+});
+</script>
+{% endblock %}

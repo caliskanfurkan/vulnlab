@@ -1,0 +1,35 @@
+{% extends "layout.njk" %}
+{% block title %}Sipariş INV-{{ orderId }} — {{ storeName }}{% endblock %}
+{% block content %}
+<p><a href="/orders">← Siparişlerim</a></p>
+<div id="order"><div class="empty">Yükleniyor…</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const { api, TRY, escapeHtml } = window.Pusula;
+  const box = document.getElementById('order');
+  try {
+    const o = await api('/api/v2/orders/{{ orderId }}');
+    box.innerHTML = `
+      <div class="section-head"><h1 style="margin:0">Sipariş INV-${o.id}</h1><a class="btn secondary" href="${escapeHtml(o.invoice)}">Faturayı indir (PDF)</a></div>
+      <div class="two-col">
+        <div class="panel">
+          <table><thead><tr><th>Ürün</th><th>Adet</th><th class="right">Birim</th><th class="right">Toplam</th></tr></thead><tbody>
+          ${o.items.map(i => `<tr><td>${escapeHtml(i.name)}${i.license_key ? `<div class="help">Lisans anahtarı: <code>${escapeHtml(i.license_key)}</code></div>` : ''}</td><td>${i.qty}</td><td class="right">${TRY.format(i.price)}</td><td class="right">${TRY.format(i.price * i.qty)}</td></tr>`).join('')}
+          </tbody></table>
+          <p class="right" style="font-size:18px"><strong>Toplam: ${TRY.format(o.total)}</strong>${o.coupon_code ? ` <span class="badge ok">${escapeHtml(o.coupon_code)}</span>` : ''}</p>
+        </div>
+        <div class="panel">
+          <h3>Teslimat</h3>
+          <p><span class="badge info">${escapeHtml(o.status)}</span></p>
+          <p>${escapeHtml(o.address || '-')}</p>
+          ${o.delivery_note ? `<p class="meta"><strong>Teslimat notu:</strong> ${escapeHtml(o.delivery_note)}</p>` : ''}
+          ${o.gift_message ? `<p class="meta"><strong>Hediye mesajı:</strong> ${escapeHtml(o.gift_message)}</p>` : ''}
+          <p class="meta">Sipariş tarihi: ${escapeHtml(o.created_at)}</p>
+        </div>
+      </div>`;
+  } catch (e) { box.innerHTML = `<div class="panel empty">${escapeHtml(e.message)}</div>`; }
+})();
+</script>
+{% endblock %}

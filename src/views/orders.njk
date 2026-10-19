@@ -1,0 +1,21 @@
+{% extends "layout.njk" %}
+{% block title %}Siparişlerim — {{ storeName }}{% endblock %}
+{% block content %}
+<h1>Siparişlerim</h1>
+<div class="panel"><div id="orders"><div class="empty">Yükleniyor…</div></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const { api, TRY, escapeHtml } = window.Pusula;
+  const box = document.getElementById('orders');
+  const labels = { hazirlaniyor: ['Hazırlanıyor', 'info'], kargoda: ['Kargoda', 'info'], teslim_edildi: ['Teslim edildi', 'ok'], tamamlandi: ['Tamamlandı', 'ok'], iptal: ['İptal', 'warn'] };
+  try {
+    const data = await api('/api/v2/orders');
+    if (!data.orders.length) { box.innerHTML = '<div class="empty">Henüz siparişiniz yok.</div>'; return; }
+    box.innerHTML = '<table><thead><tr><th>Sipariş</th><th>Tarih</th><th>Kalem</th><th>Durum</th><th class="right">Toplam</th><th></th></tr></thead><tbody>' +
+      data.orders.map(o => { const [t, c] = labels[o.status] || [o.status, '']; return `<tr><td><a href="/orders/${o.id}">INV-${o.id}</a></td><td>${escapeHtml(o.created_at.slice(0,16))}</td><td>${o.item_count}</td><td><span class="badge ${c}">${t}</span></td><td class="right">${TRY.format(o.total)}</td><td class="right"><a class="btn small secondary" href="/orders/${o.id}">Detay</a></td></tr>`; }).join('') + '</tbody></table>';
+  } catch (e) { box.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,122 @@
+{% extends "layout.njk" %}
+{% block title %}Sepetim — {{ storeName }}{% endblock %}
+{% block content %}
+<h1>Sepetim</h1>
+<div class="two-col">
+  <div class="panel">
+    <div id="cart-items"></div>
+  </div>
+  <div>
+    <div class="panel">
+      <h3>Sipariş özeti</h3>
+      <table>
+        <tr><td>Ara toplam</td><td class="right" id="subtotal">₺0,00</td></tr>
+        <tr id="discount-row" style="display:none"><td>İndirim (<span id="discount-label"></span>)</td><td class="right" id="discount">-₺0,00</td></tr>
+        <tr><td>Kargo</td><td class="right">Ücretsiz</td></tr>
+        <tr><th>Toplam</th><th class="right" id="total">₺0,00</th></tr>
+      </table>
+      <div class="field" style="margin-top:14px"><label>Kupon kodu</label>
+        <div style="display:flex; gap:8px"><input id="coupon" placeholder="YAZ2026"><button class="btn secondary" type="button" id="apply-coupon">Uygula</button></div>
+        <div class="help" id="coupon-help"></div>
+      </div>
+      {% if user %}
+      <div class="help">Kullanılabilir bakiyeniz: <strong id="credit">…</strong> · <a href="/account#bakiye">Hediye çeki tanımla</a></div>
+      {% endif %}
+    </div>
+    {% if user %}
+    <div class="panel">
+      <h3>Teslimat</h3>
+      <form id="checkout-form">
+        <div class="field"><label>Teslimat adresi</label><textarea name="address" rows="3" required>{{ user.address or '' }}</textarea></div>
+        <div class="field"><label>Hediye mesajı (isteğe bağlı)</label><input name="gift_message" placeholder="Nice yıllara!"></div>
+        <div class="field"><label>Teslimat notu (isteğe bağlı)</label><input name="delivery_note" placeholder="Kapıcıya bırakılabilir"></div>
+        <div id="checkout-notice"></div>
+        <button class="btn" type="submit" id="checkout-btn" style="width:100%">Siparişi tamamla</button>
+        <p class="help">Ödeme, hesap bakiyenizden tahsil edilir.</p>
+      </form>
+    </div>
+    {% else %}
+    <div class="panel"><p>Siparişi tamamlamak için <a href="/login?next=/cart">giriş yapın</a> veya <a href="/register">kayıt olun</a>.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const { api, getCart, saveCart, escapeHtml, TRY, showNotice, toast } = window.Pusula;
+  let coupon = null;
+
+  function totals() {
+    const cart = getCart();
+    const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const discount = coupon ? subtotal * coupon.discount_pct / 100 : 0;
+    document.getElementById('subtotal').textContent = TRY.format(subtotal);
+    document.getElementById('total').textContent = TRY.format(subtotal - discount);
+    document.getElementById('discount-row').style.display = coupon ? '' : 'none';
+    if (coupon) { document.getElementById('discount').textContent = '-' + TRY.format(discount); document.getElementById('discount-label').textContent = coupon.code; }
+  }
+
+  function render() {
+    const cart = getCart();
+    const box = document.getElementById('cart-items');
+    if (!cart.length) { box.innerHTML = '<div class="empty">Sepetiniz boş. <a href="/">Alışverişe başlayın</a>.</div>'; totals(); return; }
+    box.innerHTML = `<table><thead><tr><th>Ürün</th><th>Adet</th><th class="right">Birim</th><th class="right">Toplam</th><th></th></tr></thead><tbody>` +
+      cart.map((i, idx) => `<tr>
+        <td><div style="display:flex; gap:10px; align-items:center"><img src="/static/img/${escapeHtml(i.image)}" width="44" alt=""><a href="/products/${i.product_id}">${escapeHtml(i.name)}</a></div></td>
+        <td><input type="number" min="1" max="50" value="${i.qty}" data-qty="${idx}" style="width:70px"></td>
+        <td class="right">${TRY.format(i.price)}</td>
+        <td class="right">${TRY.format(i.price * i.qty)}</td>
+        <td class="right"><button class="btn small secondary" data-remove="${idx}">Kaldır</button></td></tr>`).join('') + '</tbody></table>';
+    totals();
+  }
+
+  document.addEventListener('change', (e) => {
+    if (e.target.matches('[data-qty]')) { const cart = getCart(); cart[e.target.dataset.qty].qty = Math.max(1, parseInt(e.target.value, 10) || 1); saveCart(cart); render(); }
+  });
+  document.addEventListener('click', (e) => {
+    const rm = e.target.closest('[data-remove]');
+    if (rm) { const cart = getCart(); cart.splice(Number(rm.dataset.remove), 1); saveCart(cart); render(); }
+  });
+
+  document.getElementById('apply-coupon').addEventListener('click', async () => {
+    const code = document.getElementById('coupon').value.trim();
+    const help = document.getElementById('coupon-help');
+    if (!code) { coupon = null; help.textContent = ''; totals(); return; }
+    try { coupon = await api('/api/v2/coupons/' + encodeURIComponent(code)); help.textContent = `%${coupon.discount_pct} indirim uygulandı`; }
+    catch (err) { coupon = null; help.textContent = err.status === 401 ? 'Kupon kullanmak için giriş yapın' : err.message; }
+    totals();
+  });
+
+  const creditEl = document.getElementById('credit');
+  if (creditEl) api('/api/v2/me').then(me => creditEl.textContent = TRY.format(me.credit)).catch(() => creditEl.textContent = '—');
+
+  const form = document.getElementById('checkout-form');
+  if (form) form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cart = getCart();
+    if (!cart.length) return showNotice('#checkout-notice', 'error', 'Sepetiniz boş');
+    const fd = new FormData(form);
+    const btn = document.getElementById('checkout-btn');
+    btn.disabled = true;
+    try {
+      const order = await api('/api/v2/checkout', { method: 'POST', body: {
+        items: cart.map(i => ({ product_id: i.product_id, qty: i.qty, price: i.price })),
+        address: fd.get('address'),
+        gift_message: fd.get('gift_message') || undefined,
+        delivery_note: fd.get('delivery_note') || undefined,
+        coupon: coupon ? coupon.code : undefined,
+      }});
+      saveCart([]);
+      toast('Siparişiniz alındı');
+      location.href = '/orders/' + order.order_id;
+    } catch (err) {
+      showNotice('#checkout-notice', 'error', err.message + (err.data && err.data.hint ? ' — ' + err.data.hint : ''));
+      btn.disabled = false;
+    }
+  });
+
+  render();
+})();
+</script>
+{% endblock %}

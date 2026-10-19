@@ -1,0 +1,10 @@
+{% extends "layout.njk" %}
+{% block title %}Satıcı paneli — {{ storeName }}{% endblock %}
+{% block content %}
+<h1>Satıcı paneli</h1>
+<div id="vendor"><div class="empty">Yükleniyor…</div></div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+<script>Pusula.Dashboard.vendor();</script>
+{% endblock %}

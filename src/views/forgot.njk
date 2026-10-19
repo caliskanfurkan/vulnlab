@@ -1,0 +1,26 @@
+{% extends "layout.njk" %}
+{% block title %}Şifremi unuttum — {{ storeName }}{% endblock %}
+{% block content %}
+<div class="auth-box panel">
+  <h1>Şifremi unuttum</h1>
+  <p class="help">E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.</p>
+  <form id="forgot-form">
+    <div class="field"><label>E-posta</label><input type="email" name="email" required></div>
+    <div id="notice"></div>
+    <button class="btn" type="submit" style="width:100%">Bağlantı gönder</button>
+  </form>
+  <p class="help" style="margin-top:16px"><a href="/login">Girişe dön</a></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    const data = await Pusula.api('/api/v2/auth/forgot', { method: 'POST', body: { email: fd.get('email') } });
+    Pusula.showNotice('#notice', 'success', data.message);
+  } catch (err) { Pusula.showNotice('#notice', 'error', err.message); }
+});
+</script>
+{% endblock %}

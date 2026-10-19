@@ -1,0 +1,58 @@
+{% extends "layout.njk" %}
+{% block title %}{{ storeName }} — Teknoloji alışverişinin yeni adresi{% endblock %}
+{% block content %}
+{% if not q and not category %}
+<section class="hero">
+  <div>
+    <h1>Yeni sezon teknoloji, Pusula güvencesiyle</h1>
+    <p>Dizüstü bilgisayardan akıllı saate, bulut yedeklemeden aksesuara. 2 yıl garanti, 14 gün koşulsuz iade.</p>
+  </div>
+  <a class="btn" href="#urunler">Ürünleri keşfet</a>
+</section>
+<div class="announcements" id="announcements"></div>
+{% endif %}
+
+<div class="section-head" id="urunler">
+  <h2>{% if q %}“{{ q }}” için sonuçlar{% elif category %}{{ category }}{% else %}Öne çıkan ürünler{% endif %}</h2>
+  <div class="chips">
+    <a class="chip {% if not category %}active{% endif %}" href="/{% if q %}?q={{ q }}{% endif %}">Tümü</a>
+    {% for c in categories %}<a class="chip {% if category == c.category %}active{% endif %}" href="/?category={{ c.category | urlencode }}{% if q %}&q={{ q | urlencode }}{% endif %}">{{ c.category }} ({{ c.count }})</a>{% endfor %}
+  </div>
+</div>
+<div class="grid" id="products"><div class="empty">Yükleniyor…</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const { api, gql, productCard } = window.Pusula;
+  const q = {{ q | dump | safe }};
+  const category = {{ category | dump | safe }};
+  const grid = document.getElementById('products');
+
+  const ann = document.getElementById('announcements');
+  if (ann) {
+    try {
+      const data = await gql('{ announcements { id title body } }');
+      ann.innerHTML = data.announcements.map(a => `<div class="announcement"><strong>${Pusula.escapeHtml(a.title)}</strong> — ${Pusula.escapeHtml(a.body)}</div>`).join('');
+    } catch (e) { ann.remove(); }
+  }
+
+  try {
+    let products;
+    if (!q && !category) {
+      const data = await gql('{ products(featured: true, limit: 8) { id name price category image } }');
+      products = data.products;
+    } else {
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      if (category) params.set('category', category);
+      params.set('sort', 'featured');
+      products = (await api('/api/v2/products?' + params.toString())).products;
+    }
+    grid.innerHTML = products.length ? products.map(productCard).join('') : '<div class="empty">Aramanızla eşleşen ürün bulunamadı.</div>';
+  } catch (e) {
+    grid.innerHTML = `<div class="empty">Ürünler yüklenemedi: ${Pusula.escapeHtml(e.message)}</div>`;
+  }
+})();
+</script>
+{% endblock %}

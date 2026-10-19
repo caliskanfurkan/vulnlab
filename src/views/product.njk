@@ -1,0 +1,79 @@
+{% extends "layout.njk" %}
+{% block title %}{{ product.name }} — {{ storeName }}{% endblock %}
+{% block content %}
+<div class="product-detail">
+  <div class="thumb"><img src="/static/img/{{ product.image }}" alt="{{ product.name }}"></div>
+  <div>
+    <div class="meta">{{ product.category }}{% if product.vendor_name %} · Satıcı: {{ product.vendor_name }}{% else %} · Satıcı: Pusula Store{% endif %}</div>
+    <h1>{{ product.name }}</h1>
+    <div class="meta">{% if avg %}<span class="stars">★</span> {{ avg }} · {{ reviews.length }} değerlendirme{% else %}Henüz değerlendirme yok{% endif %}</div>
+    <div class="price">{{ product.price | try }}</div>
+    <p>{{ product.description }}</p>
+    <p class="meta">{% if product.is_digital %}Dijital ürün, lisans anahtarı siparişten hemen sonra hesabınıza tanımlanır.{% elif product.stock > 0 %}Stokta {{ product.stock }} adet · 1-3 iş günü içinde kargoda{% else %}Stokta yok{% endif %}</p>
+    <div style="display:flex; gap:10px; margin-top:16px">
+      <button class="btn" data-add='{{ { "id": product.id, "name": product.name, "price": product.price, "image": product.image } | dump }}'>Sepete ekle</button>
+      <a class="btn secondary" href="/cart">Sepete git</a>
+    </div>
+  </div>
+</div>
+
+<div class="two-col" style="margin-top:36px">
+  <div class="panel">
+    <h2>Değerlendirmeler</h2>
+    <div id="reviews"><div class="empty">Yükleniyor…</div></div>
+  </div>
+  <div class="panel">
+    <h3>Değerlendirme yaz</h3>
+    {% if user %}
+    <form id="review-form">
+      <div class="field"><label>Puan</label>
+        <select name="rating"><option value="5">5 — Mükemmel</option><option value="4">4 — İyi</option><option value="3">3 — Orta</option><option value="2">2 — Zayıf</option><option value="1">1 — Kötü</option></select></div>
+      <div class="field"><label>Yorumunuz</label><textarea name="body" rows="4" required minlength="5" placeholder="Deneyiminizi paylaşın"></textarea></div>
+      <div id="review-notice"></div>
+      <button class="btn" type="submit">Gönder</button>
+    </form>
+    {% else %}
+    <p class="meta">Değerlendirme yazmak için <a href="/login?next=/products/{{ product.id }}">giriş yapın</a>.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const { api, stars, escapeHtml, showNotice } = window.Pusula;
+  const productId = {{ product.id }};
+  const box = document.getElementById('reviews');
+
+  async function load() {
+    try {
+      const data = await api(`/api/v2/products/${productId}/reviews`);
+      if (!data.reviews.length) { box.innerHTML = '<div class="empty">İlk değerlendirmeyi siz yazın.</div>'; return; }
+      box.innerHTML = data.reviews.map(r => `
+        <div class="review">
+          <div class="who">${escapeHtml(r.user.name)} <span>${escapeHtml(r.created_at.slice(0, 10))}</span></div>
+          <div class="stars">${stars(r.rating)}</div>
+          <div class="text">${r.body}</div>
+        </div>`).join('');
+    } catch (e) {
+      box.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+    }
+  }
+  load();
+
+  const form = document.getElementById('review-form');
+  if (form) form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    try {
+      await api(`/api/v2/products/${productId}/reviews`, { method: 'POST', body: { rating: Number(fd.get('rating')), body: fd.get('body') } });
+      form.reset();
+      showNotice('#review-notice', 'success', 'Değerlendirmeniz yayınlandı.');
+      load();
+    } catch (err) {
+      showNotice('#review-notice', 'error', err.message);
+    }
+  });
+})();
+</script>
+{% endblock %}

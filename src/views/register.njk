@@ -1,0 +1,28 @@
+{% extends "layout.njk" %}
+{% block title %}Kayıt ol — {{ storeName }}{% endblock %}
+{% block content %}
+<div class="auth-box panel">
+  <h1>Hesap oluştur</h1>
+  <p class="help">Yeni üyelere ₺250 değerinde hoş geldin hediye çeki.</p>
+  <form id="register-form">
+    <div class="field"><label>Ad Soyad</label><input name="name" required minlength="2"></div>
+    <div class="field"><label>E-posta</label><input type="email" name="email" required></div>
+    <div class="field"><label>Şifre</label><input type="password" name="password" required minlength="8"><div class="help">En az 8 karakter</div></div>
+    <div id="notice"></div>
+    <button class="btn" type="submit" style="width:100%">Kayıt ol</button>
+  </form>
+  <p class="help" style="margin-top:16px">Zaten üye misiniz? <a href="/login">Giriş yapın</a></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await Pusula.api('/api/v2/auth/register', { method: 'POST', body: { name: fd.get('name'), email: fd.get('email'), password: fd.get('password') } });
+    location.href = '/account#bildirimler';
+  } catch (err) { Pusula.showNotice('#notice', 'error', err.message); }
+});
+</script>
+{% endblock %}

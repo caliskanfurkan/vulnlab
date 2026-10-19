@@ -1,0 +1,10 @@
+{% extends "layout.njk" %}
+{% block title %}{{ title }} — {{ storeName }}{% endblock %}
+{% block content %}
+<div class="panel" style="text-align:center; padding:60px 20px">
+  <h1>{{ title }}</h1>
+  <p class="meta">{{ message }}</p>
+  {% if debug %}<pre class="debug" style="text-align:left">{{ debug | dump(2) }}</pre>{% endif %}
+  <a class="btn" href="/">Ana sayfaya dön</a>
+</div>
+{% endblock %}

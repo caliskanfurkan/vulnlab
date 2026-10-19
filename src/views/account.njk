@@ -1,0 +1,173 @@
+{% extends "layout.njk" %}
+{% block title %}Hesabım — {{ storeName }}{% endblock %}
+{% block content %}
+<h1>Hesabım</h1>
+<div class="tabs">
+  <button data-tab="profil" class="active">Profil</button>
+  <button data-tab="bakiye">Bakiye & Hediye Çeki</button>
+  <button data-tab="tercihler">Tercihler</button>
+  <button data-tab="bildirimler">Bildirimler</button>
+</div>
+
+<div class="tab active" id="tab-profil">
+  <div class="two-col">
+    <div class="panel">
+      <h3>Profil bilgileri</h3>
+      <form id="profile-form">
+        <div class="row">
+          <div class="field"><label>Ad Soyad</label><input name="name" value="{{ user.name }}" required></div>
+          <div class="field"><label>Telefon</label><input name="phone" value="{{ user.phone or '' }}" placeholder="+90 5xx xxx xx xx"></div>
+        </div>
+        <div class="field"><label>E-posta</label><input value="{{ user.email }}" disabled><div class="help">E-posta adresi değiştirmek için destek ile iletişime geçin.</div></div>
+        <div class="field"><label>Teslimat adresi</label><textarea name="address" rows="3">{{ user.address or '' }}</textarea></div>
+        <div id="profile-notice"></div>
+        <button class="btn" type="submit">Kaydet</button>
+      </form>
+    </div>
+    <div class="panel">
+      <h3>Profil fotoğrafı</h3>
+      <div style="display:flex; gap:14px; align-items:center; margin-bottom:12px">
+        <span class="avatar" style="width:64px;height:64px;font-size:24px" id="avatar-preview">{% if user.avatar_url %}<img src="{{ user.avatar_url }}" alt="">{% else %}{{ user.name[0] | upper }}{% endif %}</span>
+        <div class="help">Gravatar, LinkedIn veya herhangi bir herkese açık görsel bağlantısı kullanabilirsiniz.</div>
+      </div>
+      <form id="avatar-form">
+        <div class="field"><label>Görsel URL</label><input name="url" type="url" placeholder="https://www.gravatar.com/avatar/…?d=identicon" required></div>
+        <div id="avatar-notice"></div>
+        <button class="btn secondary" type="submit">URL'den yükle</button>
+      </form>
+      <p class="help" style="margin-top:14px">Hesap türü: <span class="badge">{{ user.role }}</span> · Üyelik: {{ user.created_at | date }}</p>
+    </div>
+  </div>
+</div>
+
+<div class="tab" id="tab-bakiye">
+  <div class="two-col">
+    <div class="panel">
+      <h3>Bakiye</h3>
+      <div class="stats">
+        <div class="stat"><div class="label">Kullanılabilir bakiye</div><div class="value" id="credit">…</div></div>
+        <div class="stat"><div class="label">Üyelik seviyesi</div><div class="value" id="tier">…</div></div>
+      </div>
+      <div id="gold-benefits"></div>
+      <p class="help">₺1.000 ve üzeri bakiye yükleyen üyeler otomatik olarak <strong>Altın Üye</strong> olur: ücretsiz kargo, öncelikli destek hattı ve erken erişim kampanyaları.</p>
+    </div>
+    <div class="panel">
+      <h3>Hediye çeki kullan</h3>
+      <form id="giftcard-form">
+        <div class="field"><label>Hediye çeki kodu</label><input name="code" placeholder="WELCOME-XXXXXX" required style="text-transform:uppercase"></div>
+        <div id="giftcard-notice"></div>
+        <button class="btn" type="submit">Bakiyeye aktar</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="tab" id="tab-tercihler">
+  <div class="panel" style="max-width:560px">
+    <h3>Tercihler</h3>
+    <form id="prefs-form">
+      <div class="row">
+        <div class="field"><label>Tema</label><select name="theme"><option value="light">Açık</option><option value="dark">Koyu</option><option value="system">Sistem</option></select></div>
+        <div class="field"><label>Dil</label><select name="language"><option value="tr">Türkçe</option><option value="en">English</option></select></div>
+      </div>
+      <div class="field"><label><input type="checkbox" name="notif_email" style="width:auto"> E-posta bildirimleri</label></div>
+      <div class="field"><label><input type="checkbox" name="notif_sms" style="width:auto"> SMS bildirimleri</label></div>
+      <div id="prefs-notice"></div>
+      <button class="btn" type="submit">Kaydet</button>
+    </form>
+  </div>
+</div>
+
+<div class="tab" id="tab-bildirimler">
+  <div class="panel">
+    <div class="section-head" style="margin-top:0"><h3 style="margin:0">Bildirimler</h3><button class="btn small secondary" id="mark-read">Tümünü okundu işaretle</button></div>
+    <div id="notifications"><div class="empty">Yükleniyor…</div></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const { api, showNotice, escapeHtml, TRY, toast } = window.Pusula;
+
+  // Sekmeler
+  function activate(name) {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + name));
+    history.replaceState(null, '', '#' + name);
+  }
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => activate(b.dataset.tab)));
+  if (location.hash && document.getElementById('tab-' + location.hash.slice(1))) activate(location.hash.slice(1));
+
+  async function loadMe() {
+    const me = await api('/api/v2/me');
+    document.getElementById('credit').textContent = TRY.format(me.credit);
+    document.getElementById('tier').innerHTML = me.tier === 'gold' ? '<span class="badge gold">Altın Üye</span>' : '<span class="badge">Standart</span>';
+    const gb = document.getElementById('gold-benefits');
+    gb.innerHTML = me.gold_benefits ? `<div class="notice success">Altın üye ayrıcalıklarınız aktif. Öncelikli destek hattı: ${escapeHtml(me.gold_benefits.priority_support_line)} · Destek kodu: <code>${escapeHtml(me.gold_benefits.priority_support_code)}</code></div>` : '';
+    const p = me.preferences || {};
+    const f = document.getElementById('prefs-form');
+    f.theme.value = p.theme || 'light';
+    f.language.value = p.language || 'tr';
+    f.notif_email.checked = !!(p.notifications && p.notifications.email);
+    f.notif_sms.checked = !!(p.notifications && p.notifications.sms);
+    return me;
+  }
+
+  async function loadNotifications() {
+    const box = document.getElementById('notifications');
+    try {
+      const data = await api('/api/v2/me/notifications');
+      box.innerHTML = data.notifications.length ? data.notifications.map(n => `
+        <div class="notification" style="${n.read ? 'opacity:.7' : ''}">
+          <div class="title">${escapeHtml(n.title)} ${n.read ? '' : '<span class="badge info">Yeni</span>'}</div>
+          <div class="body">${escapeHtml(n.body)}</div>
+          <div class="time">${escapeHtml(n.created_at)}</div>
+        </div>`).join('') : '<div class="empty">Bildiriminiz yok.</div>';
+    } catch (e) { box.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+  }
+
+  document.getElementById('profile-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try { await api('/api/v2/me', { method: 'PATCH', body: { name: fd.get('name'), phone: fd.get('phone'), address: fd.get('address') } }); showNotice('#profile-notice', 'success', 'Profiliniz güncellendi.'); }
+    catch (err) { showNotice('#profile-notice', 'error', err.message); }
+  });
+
+  document.getElementById('avatar-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      const data = await api('/api/v2/me/avatar', { method: 'POST', body: { url: fd.get('url') } });
+      document.getElementById('avatar-preview').innerHTML = `<img src="${escapeHtml(data.avatar_url)}" alt="">`;
+      showNotice('#avatar-notice', 'success', 'Profil fotoğrafı güncellendi.');
+    } catch (err) { showNotice('#avatar-notice', 'error', err.message + (err.data && err.data.detail ? ' — ' + err.data.detail : '')); }
+  });
+
+  document.getElementById('giftcard-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      const data = await api('/api/v2/gift-cards/redeem', { method: 'POST', body: { code: fd.get('code') } });
+      showNotice('#giftcard-notice', 'success', `${TRY.format(data.amount)} bakiyenize eklendi.`);
+      e.target.reset();
+      loadMe();
+    } catch (err) { showNotice('#giftcard-notice', 'error', err.message); }
+  });
+
+  document.getElementById('prefs-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    try {
+      await api('/api/v2/me/preferences', { method: 'PUT', body: { theme: f.theme.value, language: f.language.value, notifications: { email: f.notif_email.checked, sms: f.notif_sms.checked } } });
+      showNotice('#prefs-notice', 'success', 'Tercihleriniz kaydedildi.');
+    } catch (err) { showNotice('#prefs-notice', 'error', err.message); }
+  });
+
+  document.getElementById('mark-read').addEventListener('click', async () => { await api('/api/v2/me/notifications/read', { method: 'POST' }); loadNotifications(); toast('Bildirimler okundu olarak işaretlendi'); });
+
+  loadMe().catch(() => {});
+  loadNotifications();
+})();
+</script>
+{% endblock %}
